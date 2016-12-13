@@ -317,6 +317,7 @@ class CommAdminView(BaseAdminView):
 
     global_models_icon = {}
     default_model_icon = None
+    global_model_app = {}
     apps_label_title = {}
     apps_icons = {}
 
@@ -341,7 +342,8 @@ class CommAdminView(BaseAdminView):
         for model, model_admin in self.admin_site._registry.items():
             if getattr(model_admin, 'hidden_menu', False):
                 continue
-            app_label = model._meta.app_label
+            app_label = self.global_model_app.get(model) or model._meta.app_label
+
             app_icon = None
             model_dict = {
                 'title': unicode(capfirst(model._meta.verbose_name_plural)),
