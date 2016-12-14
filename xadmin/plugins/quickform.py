@@ -95,9 +95,12 @@ class RelatedFieldWidgetWrapper(forms.Widget):
 
 
 class QuickAddBtnPlugin(BaseAdminPlugin):
+    exclude_add_button_fields = []
 
     def formfield_for_dbfield(self, formfield, db_field, **kwargs):
-        if formfield and self.model in self.admin_site._registry and isinstance(db_field, (models.ForeignKey, models.ManyToManyField)):
+        if formfield and self.model in self.admin_site._registry \
+                and isinstance(db_field, (models.ForeignKey, models.ManyToManyField)) \
+                and db_field.name not in self.exclude_add_button_fields:
             rel_model = get_model_from_relation(db_field)
             if rel_model in self.admin_site._registry and self.has_model_perm(rel_model, 'add'):
                 add_url = self.get_model_url(rel_model, 'add')
