@@ -28,7 +28,7 @@ from django.utils.translation import ugettext as _
 from django.views.decorators.csrf import csrf_protect
 from django.views.generic import View
 from collections import OrderedDict
-from xadmin.util import static, json, vendor, sortkeypicker
+from xadmin.util import static, json, vendor, sortkeypicker, get_url_by_menu
 
 from xadmin.models import Log
 
@@ -315,9 +315,19 @@ class CommAdminView(BaseAdminView):
     site_title = getattr(settings,"XADMIN_TITLE",_(u"Django Xadmin"))
     site_footer = getattr(settings,"XADMIN_FOOTER_TITLE",_(u"my-company.inc"))
 
+    menus = []
+    # Custom menu
+    # Example:
+    # menus = [
+    #     {
+    #         'title': _('Authentication'),
+    #         'icon': 'fa fa-user',
+    #         'models': ['myapp.user', 'auth.group', 'auth.permission']
+    #     }
+    # ]
+
     global_models_icon = {}
     default_model_icon = None
-    global_model_app = {}
     apps_label_title = {}
     apps_icons = {}
 
@@ -327,57 +337,36 @@ class CommAdminView(BaseAdminView):
     @filter_hook
     def get_nav_menu(self):
         site_menu = list(self.get_site_menu() or [])
-        had_urls = []
-
-        def get_url(menu, had_urls):
-            if 'url' in menu:
-                had_urls.append(menu['url'])
-            if 'menus' in menu:
-                for m in menu['menus']:
-                    get_url(m, had_urls)
-        get_url({'menus': site_menu}, had_urls)
+        had_urls = get_url_by_menu({'menus': site_menu})
 
         nav_menu = OrderedDict()
 
         for model, model_admin in self.admin_site._registry.items():
             if getattr(model_admin, 'hidden_menu', False):
                 continue
-            app_label = self.global_model_app.get(model) or model._meta.app_label
+            app_label = model._meta.app_label
 
-            app_icon = None
             model_dict = {
                 'title': unicode(capfirst(model._meta.verbose_name_plural)),
                 'url': self.get_model_url(model, "changelist"),
                 'icon': self.get_model_icon(model),
                 'perm': self.get_model_perm(model, 'view'),
                 'order': model_admin.order,
+                'label': model._meta.label_lower
             }
+
             if model_dict['url'] in had_urls:
                 continue
 
-            app_key = "app:%s" % app_label
-            if app_key in nav_menu:
-                nav_menu[app_key]['menus'].append(model_dict)
+            if not self.menus:
+                app_menu = self.default_update_nav_menu(nav_menu, model_dict, app_label)
             else:
-                # Find app title
-                app_title = unicode(app_label.title())
-                if app_label.lower() in self.apps_label_title:
-                    app_title = self.apps_label_title[app_label.lower()]
-                else:
-                    app_title = unicode(apps.get_app_config(app_label).verbose_name)
-                #find app icon
-                if app_label.lower() in self.apps_icons:
-                    app_icon = self.apps_icons[app_label.lower()]
+                app_menu = self.custom_update_nav_menu(nav_menu, model_dict, app_label)
 
-                nav_menu[app_key] = {
-                    'title': app_title,
-                    'menus': [model_dict],
-                }
+            if not app_menu:
+                continue
 
-            app_menu = nav_menu[app_key]
-            if app_icon:
-                app_menu['first_icon'] = app_icon
-            elif ('first_icon' not in app_menu or
+            if ('first_icon' not in app_menu or
                     app_menu['first_icon'] == self.default_model_icon) and model_dict.get('icon'):
                 app_menu['first_icon'] = model_dict['icon']
 
@@ -393,6 +382,56 @@ class CommAdminView(BaseAdminView):
         site_menu.extend(nav_menu)
 
         return site_menu
+
+    def default_update_nav_menu(self, nav_menu, model_dict,  app_label):
+        app_key = "app:%s" % app_label
+        if app_key in nav_menu:
+            nav_menu[app_key]['menus'].append(model_dict)
+            return nav_menu[app_key]
+
+        # Find app title
+        app_title = unicode(app_label.title())
+        if app_label.lower() in self.apps_label_title:
+            app_title = self.apps_label_title[app_label.lower()]
+        else:
+            app_title = unicode(apps.get_app_config(app_label).verbose_name)
+        # find app icon
+        app_icon = None
+        if app_label.lower() in self.apps_icons:
+            app_icon = self.apps_icons[app_label.lower()]
+
+        nav_menu[app_key] = {
+            'title': app_title,
+            'menus': [model_dict],
+            'first_icon': app_icon
+        }
+
+        return nav_menu[app_key]
+
+    def custom_update_nav_menu(self, nav_menu, model_dict,  app_label):
+        menu = None
+        for m in self.menus:
+            if model_dict['label'] in m['models']:
+                menu = m
+                break
+
+        if not menu:
+            return
+        key = self.menus.index(menu)
+
+        model_dict['order'] = menu['models'].index(model_dict['label'])
+
+        if key in nav_menu:
+            nav_menu[key]['menus'].append(model_dict)
+            return nav_menu[key]
+
+        nav_menu[key] = {
+            'title': menu['title'],
+            'menus': [model_dict],
+            'first_icon': menu['icon']
+        }
+
+        return nav_menu[key]
 
     @filter_hook
     def get_context(self):
@@ -474,6 +513,7 @@ class CommAdminView(BaseAdminView):
             'url': self.get_admin_url('index'),
             'title': _('Home')
             }]
+
 
 class ModelAdminView(CommAdminView):
 
