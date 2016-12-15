@@ -276,7 +276,7 @@ class AdminSite(object):
             if settings_class:
                 merges.append(settings_class)
             merges.append(klass)
-        new_class_name = ''.join([c.__name__ for c in merges])
+        new_class_name = '.'.join(reversed([c.__name__ for c in merges]))
 
         if new_class_name not in self._admin_view_cache:
             plugins = self.get_plugins(view_class, option_class)
