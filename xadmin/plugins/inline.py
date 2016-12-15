@@ -130,8 +130,10 @@ class InlineModelAdmin(ModelFormAdminView):
     max_num = None
     can_delete = True
     fields = []
+    exclude = []
     admin_view = None
     style = 'stacked'
+    show_detail_link = False
 
     def init(self, admin_view):
         self.admin_view = admin_view
@@ -161,7 +163,7 @@ class InlineModelAdmin(ModelFormAdminView):
             "form": self.form,
             "formset": self.formset,
             "fk_name": self.fk_name,
-            'fields': forms.ALL_FIELDS,
+            'fields': forms.ALL_FIELDS,  # self.fields?
             "exclude": exclude,
             "formfield_callback": self.formfield_for_dbfield,
             "extra": self.extra,
@@ -238,6 +240,15 @@ class InlineModelAdmin(ModelFormAdminView):
                             label = getattr(getattr(self, readonly_field), 'short_description', readonly_field)
                         if value:
                             form.readonly_fields.append({'label': label, 'contents': value})
+
+        if self.show_detail_link:
+            # added detail link to forms
+            for form in instance.forms:
+                if not form.instance.pk:
+                    continue
+
+                form.detail_link = self.get_detail_url(form.instance.pk)
+
         return instance
 
     def has_auto_field(self, form):
@@ -278,6 +289,14 @@ class InlineModelAdmin(ModelFormAdminView):
 
         codename = get_permission_codename('delete', self.opts)
         return self.user.has_perm("%s.%s" % (self.opts.app_label, codename))
+
+    def get_detail_url(self, pk):
+        if not self.show_detail_link or self.model not in self.admin_site._registry.keys():
+            return
+        app_label = self.model._meta.app_label
+        model_name = self.model._meta.model_name
+
+        return self.get_admin_url('{}_{}_detail'.format(app_label, model_name), pk)
 
 
 class GenericInlineModelAdmin(InlineModelAdmin):
