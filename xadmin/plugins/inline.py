@@ -297,7 +297,7 @@ class InlineModelAdmin(ModelFormAdminView):
         app_label = self.model._meta.app_label
         model_name = self.model._meta.model_name
 
-        return self.get_admin_url('{}_{}_detail'.format(app_label, model_name), pk)
+        return self.get_admin_url('{}_{}_change'.format(app_label, model_name), pk)
 
 
 class GenericInlineModelAdmin(InlineModelAdmin):

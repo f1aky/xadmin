@@ -81,24 +81,23 @@ class ResultField(object):
             f, attr, value = lookup_field(
                 self.field_name, self.obj, self.admin_view)
         except (AttributeError, ObjectDoesNotExist):
-            self.text
-        else:
-            if f is None:
-                self.allow_tags = getattr(attr, 'allow_tags', False)
-                boolean = getattr(attr, 'boolean', False)
-                if boolean:
-                    self.allow_tags = True
-                    self.text = boolean_icon(value)
-                else:
-                    self.text = smart_unicode(value)
+            return
+        if f is None:
+            self.allow_tags = getattr(attr, 'allow_tags', False)
+            boolean = getattr(attr, 'boolean', False)
+            if boolean:
+                self.allow_tags = True
+                self.text = boolean_icon(value)
             else:
-                if isinstance(f.rel, models.ManyToOneRel):
-                    self.text = getattr(self.obj, f.name)
-                else:
-                    self.text = display_for_field(value, f)
-            self.field = f
-            self.attr = attr
-            self.value = value
+                self.text = smart_unicode(value)
+        else:
+            if isinstance(f.rel, models.ManyToOneRel):
+                self.text = getattr(self.obj, f.name)
+            else:
+                self.text = display_for_field(value, f)
+        self.field = f
+        self.attr = attr
+        self.value = value
 
     @property
     def val(self):
