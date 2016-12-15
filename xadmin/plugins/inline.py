@@ -146,16 +146,17 @@ class InlineModelAdmin(ModelFormAdminView):
     @filter_hook
     def get_formset(self, **kwargs):
         """Returns a BaseInlineFormSet class for use in admin add/change views."""
-        if self.exclude is None:
-            exclude = []
-        else:
-            exclude = list(self.exclude)
+        exclude = self.exclude or list()
         exclude.extend(self.get_readonly_fields())
+
         if self.exclude is None and hasattr(self.form, '_meta') and self.form._meta.exclude:
             # Take the custom ModelForm's Meta.exclude into account only if the
             # InlineModelAdmin doesn't define its own.
             exclude.extend(self.form._meta.exclude)
         # if exclude is an empty list we use None, since that's the actual
+        if self.fields:
+            exclude.extend(set([field.name for field in self.model._meta.fields]) - set(self.fields))
+
         # default
         exclude = exclude or None
         can_delete = self.can_delete and self.has_delete_permission()
@@ -163,7 +164,7 @@ class InlineModelAdmin(ModelFormAdminView):
             "form": self.form,
             "formset": self.formset,
             "fk_name": self.fk_name,
-            'fields': forms.ALL_FIELDS,  # self.fields?
+            'fields': forms.ALL_FIELDS,
             "exclude": exclude,
             "formfield_callback": self.formfield_for_dbfield,
             "extra": self.extra,
@@ -452,11 +453,7 @@ class InlineFormsetPlugin(BaseAdminPlugin):
         replace_inline_objects(layout, fs)
 
         if fs:
-            container = get_first_field(layout, Column)
-            if not container:
-                container = get_first_field(layout, Container)
-            if not container:
-                container = layout
+            container = get_first_field(layout, Column) or get_first_field(layout, Container) or layout
 
             # fixed #176 bug, change dict to list
             for key, value in fs:
@@ -475,16 +472,16 @@ class InlineFormsetPlugin(BaseAdminPlugin):
     def _get_detail_formset_instance(self, inline):
         formset = inline.instance_form(extra=0, max_num=0, can_delete=0)
         formset.detail_page = True
-        if True:
-            replace_field_to_value(formset.helper.layout, inline)
-            model = inline.model
-            opts = model._meta
-            fake_admin_class = type(str('%s%sFakeAdmin' % (opts.app_label, opts.model_name)), (object, ), {'model': model})
-            for form in formset.forms:
-                instance = form.instance
-                if instance.pk:
-                    form.detail = self.get_view(
-                        DetailAdminUtil, fake_admin_class, instance)
+
+        replace_field_to_value(formset.helper.layout, inline)
+        model = inline.model
+        opts = model._meta
+        fake_admin_class = type(str('%s%sFakeAdmin' % (opts.app_label, opts.model_name)), (object,), {'model': model})
+        for form in formset.forms:
+            instance = form.instance
+            if instance.pk:
+                form.detail = self.get_view(
+                    DetailAdminUtil, fake_admin_class, instance)
         return formset
 
 class DetailAdminUtil(DetailAdminView):
