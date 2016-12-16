@@ -156,6 +156,8 @@ class InlineModelAdmin(ModelFormAdminView):
         # if exclude is an empty list we use None, since that's the actual
         if self.fields:
             exclude.extend(set([field.name for field in self.model._meta.fields]) - set(self.fields))
+            if 'id' in exclude:
+                exclude.remove('id')
 
         # default
         exclude = exclude or None
